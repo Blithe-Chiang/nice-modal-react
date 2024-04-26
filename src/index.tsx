@@ -11,7 +11,7 @@
  * @module NiceModal
  * */
 
-import React, { useEffect, useCallback, useContext, useReducer, useMemo, ReactNode } from 'react';
+import React, { useEffect, useCallback, useContext, useMemo, ReactNode, forwardRef, useImperativeHandle } from 'react';
 
 export interface NiceModalState {
   id: string;
@@ -97,7 +97,21 @@ const MODAL_REGISTRY: {
     props?: Record<string, unknown>;
   };
 } = {};
-const ALREADY_MOUNTED = {};
+
+// NOTE: 根据dispatch或者对应的页面来设置，否则在另一个页面弹出弹窗后，之前的页面无法弹出相同弹窗
+// const ALREADY_MOUNTED = {};
+
+class _MountUtil {
+  private weakMap = new WeakMap();
+  get ALREADY_MOUNTED() {
+    return this.weakMap.get(dispatch);
+  }
+  init(dispatch: any) {
+    this.weakMap.set(dispatch, {});
+  }
+}
+
+const MountUtil = new _MountUtil();
 
 let uidSeed = 0;
 let dispatch: React.Dispatch<NiceModalAction> = () => {
@@ -122,8 +136,8 @@ export const reducer = (
           // If modal is not mounted, mount it first then make it visible.
           // There is logic inside HOC wrapper to make it visible after its first mount.
           // This mechanism ensures the entering transition.
-          visible: !!ALREADY_MOUNTED[modalId],
-          delayVisible: !ALREADY_MOUNTED[modalId],
+          visible: !!MountUtil.ALREADY_MOUNTED[modalId],
+          delayVisible: !MountUtil.ALREADY_MOUNTED[modalId],
         },
       };
     }
@@ -393,10 +407,10 @@ export const create = <P extends {}>(
         show();
       }
 
-      ALREADY_MOUNTED[id] = true;
+      MountUtil.ALREADY_MOUNTED[id] = true;
 
       return () => {
-        delete ALREADY_MOUNTED[id];
+        delete MountUtil.ALREADY_MOUNTED[id];
       };
     }, [id, show, defaultVisible]);
 
@@ -451,7 +465,7 @@ const NiceModalPlaceholder: React.FC = () => {
   const modals = useContext(NiceModalContext);
   const visibleModalIds = Object.keys(modals).filter((id) => !!modals[id]);
   visibleModalIds.forEach((id) => {
-    if (!MODAL_REGISTRY[id] && !ALREADY_MOUNTED[id]) {
+    if (!MODAL_REGISTRY[id] && !MountUtil.ALREADY_MOUNTED[id]) {
       console.warn(
         `No modal found for id: ${id}. Please check the id or if it is registered or declared via JSX.`,
       );
@@ -475,30 +489,43 @@ const NiceModalPlaceholder: React.FC = () => {
   );
 };
 
-const InnerContextProvider: React.FC = ({ children }) => {
-  const arr = useReducer(reducer, initialState);
-  const modals = arr[0];
-  dispatch = arr[1];
-  return (
-    <NiceModalContext.Provider value={modals}>
-      {children}
-      <NiceModalPlaceholder />
-    </NiceModalContext.Provider>
-  );
-};
+// const InnerContextProvider: React.FC = ({ children }) => {
+//   const arr = useReducer(reducer, initialState);
+//   const modals = arr[0];
+//   dispatch = arr[1];
+//   return (
+//     <NiceModalContext.Provider value={modals}>
+//       {children}
+//       <NiceModalPlaceholder />
+//     </NiceModalContext.Provider>
+//   );
+// };
 
-export const Provider: React.FC<Record<string, unknown>> = ({
-  children,
-  dispatch: givenDispatch,
-  modals: givenModals,
-}: {
+interface IProps_Provider {
   children: ReactNode;
-  dispatch?: React.Dispatch<NiceModalAction>;
-  modals?: NiceModalStore;
-}) => {
-  if (!givenDispatch || !givenModals) {
-    return <InnerContextProvider>{children}</InnerContextProvider>;
-  }
+  dispatch: React.Dispatch<NiceModalAction>;
+  modals: NiceModalStore;
+}
+
+export const Provider = forwardRef(({ children, dispatch: givenDispatch, modals: givenModals, }: IProps_Provider, ref) => {
+  useImperativeHandle(ref, () => {
+    return {
+      updateDispatch: () => {
+        if (givenDispatch) {
+          dispatch = givenDispatch;
+        }
+      }
+    }
+  })
+
+  useEffect(() => {
+    MountUtil.init(dispatch);
+  }, []);
+  
+  // if (!givenDispatch || !givenModals) {
+  //   return <InnerContextProvider>{children}</InnerContextProvider>;
+  // }
+
   dispatch = givenDispatch;
   return (
     <NiceModalContext.Provider value={givenModals}>
@@ -506,7 +533,7 @@ export const Provider: React.FC<Record<string, unknown>> = ({
       <NiceModalPlaceholder />
     </NiceModalContext.Provider>
   );
-};
+});
 
 /**
  * Declarative way to register a modal.

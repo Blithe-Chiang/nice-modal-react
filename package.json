@@ -1,11 +1,11 @@
 {
-  "name": "@ebay/nice-modal-react",
-  "version": "1.2.13",
+  "name": "vfup-nice-modal-react",
+  "version": "1.2.14",
   "license": "MIT",
   "main": "./lib/cjs/index.js",
   "module": "./lib/esm/index.js",
   "types": "./lib/esm/index.d.ts",
-  "repository": "https://github.com/eBay/nice-modal-react",
+  "repository": "https://github.com/Blithe-Chiang/nice-modal-react",
   "publishConfig": {
     "registry": "https://registry.npmjs.org"
   },

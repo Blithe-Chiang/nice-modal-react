@@ -509,7 +509,9 @@ export const Provider = forwardRef<ProviderHandle, IProps_Provider>(({ children 
   useImperativeHandle(ref, () => {
     return {
       reset: () => {
-        dispatch = _dispatch;
+        setTimeout(() => {
+          dispatch = _dispatch;
+        }, 0);
       },
     }
   }, []);

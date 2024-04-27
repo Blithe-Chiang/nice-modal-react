@@ -11,7 +11,7 @@
  * @module NiceModal
  * */
 
-import React, { useEffect, useCallback, useContext, useMemo, ReactNode, forwardRef, useImperativeHandle } from 'react';
+import React, { ReactNode, forwardRef, useCallback, useContext, useEffect, useImperativeHandle, useMemo, useReducer } from 'react';
 
 export interface NiceModalState {
   id: string;
@@ -489,46 +489,32 @@ const NiceModalPlaceholder: React.FC = () => {
   );
 };
 
-// const InnerContextProvider: React.FC = ({ children }) => {
-//   const arr = useReducer(reducer, initialState);
-//   const modals = arr[0];
-//   dispatch = arr[1];
-//   return (
-//     <NiceModalContext.Provider value={modals}>
-//       {children}
-//       <NiceModalPlaceholder />
-//     </NiceModalContext.Provider>
-//   );
-// };
-
 interface IProps_Provider {
   children: ReactNode;
-  dispatch: React.Dispatch<NiceModalAction>;
-  modals: NiceModalStore;
 }
 
-export const Provider = forwardRef(({ children, dispatch: givenDispatch, modals: givenModals, }: IProps_Provider, ref) => {
-  useImperativeHandle(ref, () => {
-    return {
-      updateDispatch: () => {
-        if (givenDispatch) {
-          dispatch = givenDispatch;
-        }
-      }
-    }
-  })
+export interface ProviderHandle {
+  /** reset global dispatch, so that modals will be shown in correct Provider */
+  reset: () => void;
+}
+
+export const Provider = forwardRef<ProviderHandle, IProps_Provider>(({ children }, ref) => {
+  const [modals, _dispatch] = useReducer(reducer, initialState);
 
   useEffect(() => {
-    MountUtil.init(dispatch);
+    dispatch = _dispatch;
+    MountUtil.init(_dispatch);
   }, []);
-  
-  // if (!givenDispatch || !givenModals) {
-  //   return <InnerContextProvider>{children}</InnerContextProvider>;
-  // }
 
-  dispatch = givenDispatch;
+  useImperativeHandle(ref, () => {
+    return {
+      reset: () => {
+        dispatch = _dispatch;
+      },
+    }
+  }, []);
   return (
-    <NiceModalContext.Provider value={givenModals}>
+    <NiceModalContext.Provider value={modals}>
       {children}
       <NiceModalPlaceholder />
     </NiceModalContext.Provider>
